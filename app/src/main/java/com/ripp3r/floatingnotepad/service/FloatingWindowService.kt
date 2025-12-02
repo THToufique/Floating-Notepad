@@ -22,6 +22,8 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.ripp3r.floatingnotepad.R
 import com.ripp3r.floatingnotepad.data.NoteRepository
+import com.ripp3r.floatingnotepad.utils.ThemeManager
+import android.widget.LinearLayout
 
 class FloatingWindowService : Service() {
     
@@ -94,6 +96,14 @@ class FloatingWindowService : Service() {
     private fun showPalette() {
         paletteView = LayoutInflater.from(this).inflate(R.layout.floating_palette, null)
         
+        val isDark = ThemeManager.isDarkMode(this)
+        val bgColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
+        val textColor = if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+        val navBarColor = if (isDark) 0xFF0D47A1.toInt() else 0xFF2196F3.toInt()
+        
+        paletteView?.findViewById<LinearLayout>(R.id.paletteContainer)?.setBackgroundColor(bgColor)
+        paletteView?.findViewById<View>(R.id.navBar)?.setBackgroundColor(navBarColor)
+        
         val params = WindowManager.LayoutParams(
             800,
             600,
@@ -111,6 +121,9 @@ class FloatingWindowService : Service() {
         
         editText = paletteView?.findViewById<EditText>(R.id.editText)?.apply {
             setText(currentText)
+            setTextColor(textColor)
+            setBackgroundColor(bgColor)
+            setHintTextColor(if (isDark) 0xFF888888.toInt() else 0xFF666666.toInt())
             addTextChangedListener(object : TextWatcher {
                 override fun afterTextChanged(s: Editable?) {
                     currentText = s.toString()
@@ -230,6 +243,16 @@ class FloatingWindowService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     params.x = initialX + (event.rawX - initialTouchX).toInt()
                     params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    windowManager.updateViewLayout(v, params)
+                    return true
+                }
+                MotionEvent.ACTION_UP -> {
+                    val displayMetrics = resources.displayMetrics
+                    val screenWidth = displayMetrics.widthPixels
+                    val bubbleWidth = v.width
+                    val centerX = params.x + bubbleWidth / 2
+                    
+                    params.x = if (centerX < screenWidth / 2) 0 else screenWidth - bubbleWidth
                     windowManager.updateViewLayout(v, params)
                     return true
                 }
