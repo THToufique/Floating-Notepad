@@ -8,45 +8,50 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="#FFFFFF">
+        android:background="@drawable/palette_background"
+        android:clipToOutline="true">
 
         <LinearLayout
             android:id="@+id/navBar"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="56dp"
             android:orientation="horizontal"
-            android:background="#2196F3"
+            android:background="@drawable/nav_bar_background"
             android:gravity="center_vertical"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
 
-            <ImageButton
-                android:id="@+id/btnMinimize"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Minimize" />
-
-            <View
+            <TextView
                 android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Floating Notepad"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:fontFamily="sans-serif-medium" />
 
             <ImageButton
                 android:id="@+id/btnMenu"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@android:drawable/ic_menu_more"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_more_vert"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Menu" />
 
             <ImageButton
+                android:id="@+id/btnMinimize"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_minimize"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Minimize" />
+
+            <ImageButton
                 android:id="@+id/btnClose"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_close"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Close" />
 
         </LinearLayout>
@@ -57,20 +62,24 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:gravity="top|start"
-            android:padding="16dp"
-            android:background="@android:color/white"
+            android:padding="20dp"
+            android:background="@android:color/transparent"
             android:hint="Start typing..."
             android:inputType="textMultiLine"
             android:textSize="16sp"
+            android:fontFamily="sans-serif"
+            android:lineSpacingExtra="4dp"
             android:textCursorDrawable="@drawable/cursor_visible" />
 
     </LinearLayout>
 
     <View
         android:id="@+id/resizeHandle"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
         android:layout_gravity="bottom|end"
-        android:background="#2196F3" />
+        android:layout_margin="8dp"
+        android:background="@drawable/resize_handle"
+        android:clickable="true" />
 
 </FrameLayout>

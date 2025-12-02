@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="60dp"
-    android:layout_height="60dp"
-    android:background="@drawable/bubble_background">
+    android:layout_width="64dp"
+    android:layout_height="64dp"
+    android:background="@drawable/bubble_background"
+    android:elevation="8dp">
 
     <ImageView
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
         android:layout_gravity="center"
         android:src="@android:drawable/ic_menu_edit"
-        android:contentDescription="Floating Notepad" />
+        android:tint="#FFFFFF" />
 
 </FrameLayout>

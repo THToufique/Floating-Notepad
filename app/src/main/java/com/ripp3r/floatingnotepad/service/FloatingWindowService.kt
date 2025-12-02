@@ -24,6 +24,7 @@ import com.ripp3r.floatingnotepad.R
 import com.ripp3r.floatingnotepad.data.NoteRepository
 import com.ripp3r.floatingnotepad.utils.ThemeManager
 import android.widget.LinearLayout
+import android.util.Log
 
 class FloatingWindowService : Service() {
     
@@ -36,16 +37,22 @@ class FloatingWindowService : Service() {
     private var initialTouchX = 0f
     private var initialTouchY = 0f
     private var currentText = ""
+    private var lastBubbleX = 100
+    private var lastBubbleY = 100
+    private var lastPaletteWidth = 800
+    private var lastPaletteHeight = 600
     
     override fun onBind(intent: Intent?): IBinder? = null
     
     override fun onCreate() {
         super.onCreate()
+        Log.d("FloatingService", "Service onCreate called")
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         currentText = NoteRepository.loadDraft(this)
         createNotificationChannel()
         startForeground(1, createNotification())
         showBubble()
+        Log.d("FloatingService", "Bubble should be visible now")
     }
     
     private fun createNotificationChannel() {
@@ -69,9 +76,11 @@ class FloatingWindowService : Service() {
     private fun showBubble() {
         bubbleView = LayoutInflater.from(this).inflate(R.layout.floating_bubble, null)
         
+        val bubbleSize = (ThemeManager.getBubbleSize(this) * resources.displayMetrics.density).toInt()
+        
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            bubbleSize,
+            bubbleSize,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -80,17 +89,12 @@ class FloatingWindowService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 100
-            y = 100
+            x = lastBubbleX
+            y = lastBubbleY
         }
         
         bubbleView?.setOnTouchListener(BubbleTouchListener(params))
         windowManager.addView(bubbleView, params)
-        
-        bubbleView?.setOnClickListener {
-            showPalette()
-            hideBubble()
-        }
     }
     
     private fun showPalette() {
@@ -99,14 +103,21 @@ class FloatingWindowService : Service() {
         val isDark = ThemeManager.isDarkMode(this)
         val bgColor = if (isDark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
         val textColor = if (isDark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
-        val navBarColor = if (isDark) 0xFF0D47A1.toInt() else 0xFF2196F3.toInt()
+        val navBarColor = if (isDark) 0xFF1565C0.toInt() else 0xFF2196F3.toInt()
         
-        paletteView?.findViewById<LinearLayout>(R.id.paletteContainer)?.setBackgroundColor(bgColor)
-        paletteView?.findViewById<View>(R.id.navBar)?.setBackgroundColor(navBarColor)
+        val container = paletteView?.findViewById<LinearLayout>(R.id.paletteContainer)
+        container?.background = resources.getDrawable(R.drawable.palette_background, null).apply {
+            setTint(bgColor)
+        }
+        
+        val navBar = paletteView?.findViewById<View>(R.id.navBar)
+        navBar?.background = resources.getDrawable(R.drawable.nav_bar_background, null).apply {
+            setTint(navBarColor)
+        }
         
         val params = WindowManager.LayoutParams(
-            800,
-            600,
+            lastPaletteWidth,
+            lastPaletteHeight,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -124,6 +135,7 @@ class FloatingWindowService : Service() {
             setTextColor(textColor)
             setBackgroundColor(bgColor)
             setHintTextColor(if (isDark) 0xFF888888.toInt() else 0xFF666666.toInt())
+            textSize = ThemeManager.getFontSize(this@FloatingWindowService)
             addTextChangedListener(object : TextWatcher {
                 override fun afterTextChanged(s: Editable?) {
                     currentText = s.toString()
@@ -148,7 +160,6 @@ class FloatingWindowService : Service() {
             showMenu(it)
         }
         
-        val navBar = paletteView?.findViewById<View>(R.id.navBar)
         navBar?.setOnTouchListener(PaletteTouchListener(params))
         
         val resizeHandle = paletteView?.findViewById<View>(R.id.resizeHandle)
@@ -156,21 +167,84 @@ class FloatingWindowService : Service() {
     }
     
     private fun showMenu(anchor: View) {
-        PopupMenu(this, anchor).apply {
-            menu.add("Save to Documents")
-            menu.add("Font Size +")
-            menu.add("Font Size -")
-            
-            setOnMenuItemClickListener { item ->
-                when (item.title) {
-                    "Save to Documents" -> showSaveDialog()
-                    "Font Size +" -> changeFontSize(2f)
-                    "Font Size -" -> changeFontSize(-2f)
+        val items = arrayOf("Font Size", "Save to Documents")
+        
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog)
+            .setTitle("Menu")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showFontSizeDialog()
+                    1 -> showSaveDialog()
                 }
-                true
             }
-            show()
+            .create()
+            .apply {
+                window?.setType(
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                    else
+                        WindowManager.LayoutParams.TYPE_PHONE
+                )
+            }
+            .show()
+    }
+    
+    private fun showFontSizeDialog() {
+        val currentSize = ThemeManager.getFontSize(this)
+        
+        val previewText = android.widget.TextView(this).apply {
+            text = "Preview Text"
+            textSize = currentSize
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 30, 0, 30)
         }
+        
+        val sizeLabel = android.widget.TextView(this).apply {
+            text = "${currentSize.toInt()}sp"
+            textSize = 16f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 20, 0, 10)
+        }
+        
+        val seekBar = android.widget.SeekBar(this).apply {
+            max = 12
+            progress = (currentSize - 12).toInt()
+            setPadding(50, 20, 50, 20)
+        }
+        
+        val layout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(previewText)
+            addView(sizeLabel)
+            addView(seekBar)
+        }
+        
+        seekBar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                val size = 12f + progress
+                sizeLabel.text = "${size.toInt()}sp"
+                previewText.textSize = size
+                editText?.textSize = size
+                ThemeManager.setFontSize(this@FloatingWindowService, size)
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+        
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Font Size")
+            .setView(layout)
+            .setPositiveButton("Done", null)
+            .create()
+            .apply {
+                window?.setType(
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                    else
+                        WindowManager.LayoutParams.TYPE_PHONE
+                )
+            }
+            .show()
     }
     
     private fun showSaveDialog() {
@@ -204,11 +278,17 @@ class FloatingWindowService : Service() {
     }
     
     private fun changeFontSize(delta: Float) {
-        editText?.textSize = (editText?.textSize ?: 16f) + delta
+        editText?.apply {
+            val currentSize = textSize / resources.displayMetrics.scaledDensity
+            textSize = currentSize + delta
+        }
     }
     
     private fun hideBubble() {
         bubbleView?.let {
+            val params = it.layoutParams as WindowManager.LayoutParams
+            lastBubbleX = params.x
+            lastBubbleY = params.y
             windowManager.removeView(it)
             bubbleView = null
         }
@@ -216,6 +296,9 @@ class FloatingWindowService : Service() {
     
     private fun hidePalette() {
         paletteView?.let {
+            val params = it.layoutParams as WindowManager.LayoutParams
+            lastPaletteWidth = params.width
+            lastPaletteHeight = params.height
             windowManager.removeView(it)
             paletteView = null
         }
@@ -231,6 +314,8 @@ class FloatingWindowService : Service() {
     private inner class BubbleTouchListener(
         private val params: WindowManager.LayoutParams
     ) : View.OnTouchListener {
+        private var moved = false
+        
         override fun onTouch(v: View, event: MotionEvent): Boolean {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -238,15 +323,26 @@ class FloatingWindowService : Service() {
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
-                    return false
+                    moved = false
+                    return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager.updateViewLayout(v, params)
+                    val deltaX = event.rawX - initialTouchX
+                    val deltaY = event.rawY - initialTouchY
+                    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+                        moved = true
+                        params.x = initialX + deltaX.toInt()
+                        params.y = initialY + deltaY.toInt()
+                        windowManager.updateViewLayout(v, params)
+                    }
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
+                    if (!moved) {
+                        showPalette()
+                        hideBubble()
+                        return true
+                    }
                     val displayMetrics = resources.displayMetrics
                     val screenWidth = displayMetrics.widthPixels
                     val bubbleWidth = v.width

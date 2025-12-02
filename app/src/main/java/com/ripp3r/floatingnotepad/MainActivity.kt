@@ -26,9 +26,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             var isDarkMode by remember { mutableStateOf(ThemeManager.isDarkMode(this)) }
+            var hasOverlay by remember { mutableStateOf(PermissionHelper.canDrawOverlays(this)) }
+            var hasStorage by remember { mutableStateOf(PermissionHelper.hasStoragePermission(this)) }
+            
+            LaunchedEffect(Unit) {
+                while (true) {
+                    kotlinx.coroutines.delay(500)
+                    hasOverlay = PermissionHelper.canDrawOverlays(this@MainActivity)
+                    hasStorage = PermissionHelper.hasStoragePermission(this@MainActivity)
+                }
+            }
             
             FloatingNotepadTheme(darkTheme = isDarkMode) {
                 DashboardScreen(
+                    context = this,
                     isDarkMode = isDarkMode,
                     onThemeToggle = {
                         isDarkMode = !isDarkMode
@@ -36,9 +47,9 @@ class MainActivity : ComponentActivity() {
                     },
                     onStartService = { startFloatingService() },
                     onStopService = { stopFloatingService() },
-                    hasOverlayPermission = PermissionHelper.canDrawOverlays(this),
+                    hasOverlayPermission = hasOverlay,
                     onRequestOverlayPermission = { PermissionHelper.requestOverlayPermission(this) },
-                    hasStoragePermission = PermissionHelper.hasStoragePermission(this),
+                    hasStoragePermission = hasStorage,
                     onRequestStoragePermission = {
                         val permissions = PermissionHelper.getStoragePermissions()
                         if (permissions.isNotEmpty()) {
@@ -63,6 +74,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun DashboardScreen(
+    context: ComponentActivity,
     isDarkMode: Boolean,
     onThemeToggle: () -> Unit,
     onStartService: () -> Unit,
@@ -72,23 +84,37 @@ fun DashboardScreen(
     hasStoragePermission: Boolean,
     onRequestStoragePermission: () -> Unit
 ) {
-    Scaffold { padding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "Floating Notepad",
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Text(
+                text = "Quick access notepad overlay",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
             Spacer(modifier = Modifier.height(8.dp))
             
             // Theme Toggle
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -102,7 +128,12 @@ fun DashboardScreen(
             }
             
             // Overlay Permission
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -131,7 +162,12 @@ fun DashboardScreen(
             }
             
             // Storage Permission
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -156,6 +192,35 @@ fun DashboardScreen(
                             Text("Grant Permission")
                         }
                     }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Bubble Size Slider
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    var bubbleSize by remember { mutableStateOf(ThemeManager.getBubbleSize(context)) }
+                    Text("Bubble Size: ${bubbleSize}dp")
+                    Slider(
+                        value = bubbleSize.toFloat(),
+                        onValueChange = { 
+                            bubbleSize = it.toInt()
+                            ThemeManager.setBubbleSize(context, bubbleSize)
+                        },
+                        onValueChangeFinished = {
+                            // Restart service to apply new bubble size
+                            context.stopService(Intent(context, FloatingWindowService::class.java))
+                            context.startService(Intent(context, FloatingWindowService::class.java))
+                        },
+                        valueRange = 48f..96f,
+                        steps = 11
+                    )
                 }
             }
             
